@@ -1,0 +1,4 @@
+.venv/*
+!.venv/lib/python3.10/site-packages/gym_super_mario_bros
+!.venv/lib/python3.10/site-packages/gym
+!.venv/lib/python3.10/site-packages/nes-py
