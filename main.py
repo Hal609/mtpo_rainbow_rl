@@ -13,27 +13,26 @@ from matplotlib import pyplot as plt
 
 from smb_env.smb_env_cynes import SuperMarioBrosEnv
 
-def make_env(envs_create, game, life_info, framestack, repeat_probs):
-    gym.register(
-    id="gymnasium_env/smb-v5",
-    entry_point=SuperMarioBrosEnv,
-)
+def make_env(envs_create, game, life_info, framestack, repeat_probs, headless=True):
+    rom_path = (
+        "C:/Users/offan/Downloads/4398_Beyond_The_Rainbow_High_P_Supplementary Material/"
+        "BeyondTheRainbowICLR/smb_env/super-mario-bros.nes"
+    )
+    print(f"Creating {envs_create} envs")
 
-    rom_path = "C:/Users/offan/Downloads/4398_Beyond_The_Rainbow_High_P_Supplementary Material/BeyondTheRainbowICLR/smb_env/super-mario-bros-rectangle.nes"
-    # Create a vectorized environment
+    def create_env():
+        gym.register(
+            id="gymnasium_env/smb-v5",
+            entry_point=SuperMarioBrosEnv,
+        )
+        env = SMBPreprocessingCustom(gym.make("gymnasium_env/smb-v5", rom_path=rom_path, headless=headless))
+
+        return gym.wrappers.FrameStack(env, num_stack=framestack, lz4_compress=False)
+    
     return gym.vector.AsyncVectorEnv(
-        [
-            lambda: gym.wrappers.FrameStack(
-                gym.make("gymnasium_env/smb-v5", rom_path=rom_path, headless=False), 
-                num_stack=framestack,  # Number of frames to stack
-                lz4_compress=False,  # Compression option for FrameStack
-            )
-            for _ in range(envs_create)
-        ],
+        [lambda: create_env() for _ in range(envs_create)],
         context="spawn",  # Required for Windows
     )
-
-    #, render_mode="human"
 
 
 def non_default_args(args, parser):
@@ -112,14 +111,14 @@ def main():
     parser = argparse.ArgumentParser()
 
     # environment setup
-    parser.add_argument('--game', type=str, default="NameThisGame")
-    parser.add_argument('--envs', type=int, default=32)
+    parser.add_argument('--game', type=str, default="Mario")
+    parser.add_argument('--envs', type=int, default=38)
     parser.add_argument('--bs', type=int, default=256)
     parser.add_argument('--rr', type=float, default=1)
     parser.add_argument('--frames', type=int, default=200000000)
     parser.add_argument('--repeat', type=int, default=0)
     parser.add_argument('--include_evals', type=int, default=1)
-    parser.add_argument('--eval_envs', type=int, default=10)
+    parser.add_argument('--eval_envs', type=int, default=3)
     parser.add_argument('--life_info', type=int, default=0)
     parser.add_argument('--num_eval_episodes', type=int, default=100)
     parser.add_argument('--analy', type=int, default=False)
@@ -128,7 +127,7 @@ def main():
 
     # agent setup
     parser.add_argument('--nstep', type=int, default=3)
-    parser.add_argument('--vector', type=int, default=0)
+    parser.add_argument('--vector', type=int, default=1)
     parser.add_argument('--maxpool_size', type=int, default=6)
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--testing', type=bool, default=False)
@@ -231,9 +230,9 @@ def main():
         counter = 0
         while True:
             if counter == 0:
-                new_dir_name = agent_name
+                new_dir_name = "output/" + agent_name
             else:
-                new_dir_name = f"{agent_name}_{counter}"
+                new_dir_name = f"output/{agent_name}_{counter}"
             if not os.path.exists(new_dir_name):
                 break
             counter += 1
@@ -266,12 +265,12 @@ def main():
     device = torch.device('cuda:' + gpu if torch.cuda.is_available() else 'cpu')
     print("Device: " + str(device))
 
-    env = make_env(num_envs, game, life_info, framestack, repeat_probs)
-    print(env.observation_space)
-    print(env.action_space[0])
-    n_actions = env.action_space[0].n
+    env = make_env(num_envs, game, life_info, framestack, repeat_probs, headless=vector)
 
-    agent = Agent(n_actions=env.action_space[0].n, input_dims=[framestack, 84, 84], device=device, num_envs=num_envs,
+    n_actions = env.action_space[0].n
+    print(f"Env has {n_actions} actions")
+
+    agent = Agent(n_actions=env.action_space[0].n, input_dims=[framestack, 128, 128], device=device, num_envs=num_envs,
                   agent_name=agent_name, total_frames=n_steps, testing=testing, batch_size=bs, rr=rr, lr=lr,
                   maxpool_size=maxpool_size, target_replace=c,
                   noisy=noisy, spectral=spectral, munch=munch, iqn=iqn, double=double, dueling=dueling, impala=impala,
@@ -294,7 +293,7 @@ def main():
 
     if testing:
         from torchsummary import summary
-        summary(agent.net, (framestack, 84, 84))
+        summary(agent.net, (framestack, 128, 128))
 
     while steps < n_steps:
         steps += num_envs
@@ -315,7 +314,7 @@ def main():
         reward = np.clip(reward, -1., 1.)
 
         for stream in range(num_envs):
-            terminal_in_buffer = done_[stream] or info["lost_life"][stream]
+            terminal_in_buffer = done_[stream] #or info["lost_life"][stream]
             agent.store_transition(observation[stream], action[stream], reward[stream], observation_[stream],
                                    terminal_in_buffer, stream=stream)
 

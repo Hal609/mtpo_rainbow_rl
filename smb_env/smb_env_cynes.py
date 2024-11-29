@@ -1,5 +1,6 @@
 """An OpenAI Gym environment for Super Mario Bros. and Lost Levels."""
 from collections import defaultdict
+import gymnasium as gym
 from .cynes_env import NESEnv
 import numpy as np
 
@@ -29,33 +30,46 @@ class SuperMarioBrosEnv(NESEnv):
 
         """
         super().__init__(rom_path, headless=headless)
+
+        # Existing initialization code...
+        self.action_space = gym.spaces.Discrete(4)  # Only four actions
+
+        # Define the reduced action mapping
+        self._action_map = [int("10000001", 2), int("10000000", 2), int("10000011", 2), int("10000010", 2)]  # Corresponds to Left and Left+Jump
+
         # Initialize any additional variables
         self._time_last = 0
         self._x_position_last = 0
 
-        self._target_world, self._target_stage, self._target_area = 1, 1, None
+        self._target_world, self._target_stage, self._target_area = None, None, None
         # Reset the emulator
         self.reset()
         # Skip the start screen
         self._skip_start_screen()
         # Create a backup state to restore from on subsequent calls to reset
         self._backup()
-
+    
     def step(self, action):
         if self.done:
             raise ValueError('Cannot step in a done environment! Call `reset` first.')
-        self.nes.controller = reverse_bits(action)
+        
+        self.nes.controller = reverse_bits(self._action_map[action])
         frame = self.nes.step(frames=1)
-        obs = frame
+
+        obs = np.array(frame, dtype=np.uint8)
         reward = float(self.get_reward())
         self.done = bool(self._get_done())
         truncated = False
         info = self._get_info()
+
+        self._did_step(self.done)
+
         # bound the reward in [min, max]
         if reward < self.reward_range[0]:
             reward = self.reward_range[0]
         elif reward > self.reward_range[1]:
             reward = self.reward_range[1]
+            
         return obs, reward, self.done, truncated, info
 
     @property
@@ -381,7 +395,7 @@ class SuperMarioBrosEnv(NESEnv):
     def _get_done(self):
         """Return True if the episode is over, False otherwise."""
         # if self.is_single_stage_env:
-        return self._is_dying or self._is_dead or self._flag_get
+        # return self._is_dying or self._is_dead or self._flag_get
         return self._is_game_over
 
     def _get_info(self):

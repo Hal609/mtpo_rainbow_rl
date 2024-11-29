@@ -44,15 +44,15 @@ class NESEnv(gym.Env):
     reward_range = (-float(15), float(15))
 
     # observation space for the environment is static across all instances
-    observation_space = Box(
-        low=0,
-        high=255,
-        shape=SCREEN_SHAPE_24_BIT,
-        dtype=np.uint8
-    )
+    # observation_space = Box(
+    #     low=0,
+    #     high=255,
+    #     shape=SCREEN_SHAPE_24_BIT,
+    #     dtype=np.uint8
+    # )
 
     # action space is a bitmap of button press values for the 8 NES buttons
-    action_space = Discrete(256)
+    # action_space = Discrete(256)
 
     def __init__(self, rom_path, headless=False):
         # create a ROM file from the ROM path
@@ -104,7 +104,8 @@ class NESEnv(gym.Env):
         # call the after reset callback
         self._did_reset()
         self.done = False
-        obs = np.zeros((240, 256, 3), dtype=np.uint8)
+        obs = self.nes.step(frames=1)  # Capture an initial frame
+        obs = np.array(obs, dtype=np.uint8)  # Ensure it's a valid numpy array
         info = {}
         return obs, info
 
@@ -136,9 +137,9 @@ class NESEnv(gym.Env):
         # Update the current frame (observation)
         self.screen = frame
 
-    def close(self):
-        self.nes.close()
-        if hasattr(self, 'window'):
-            self.window.close()
+    # def close(self):
+    #     # self.nes.close()
+    #     if hasattr(self, 'window'):
+    #         self.window.close()
 
 

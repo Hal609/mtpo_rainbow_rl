@@ -91,7 +91,7 @@ class Agent:
                  discount=0.997, per=True,
                  taus=8, model_size=2, linear_size=512, ncos=64, rainbow=False, maxpool=True,
                  non_factorised=False, replay_period=1, analytics=True, framestack=4,
-                 rgb=False, imagex=84, imagey=84, arch='impala', per_alpha=0.2,
+                 rgb=False, imagex=128, imagey=128, arch='impala', per_alpha=0.2,
                  per_beta_anneal=False, layer_norm=False, max_mem_size=1048576, c51=False,
                  eps_steps=2000000, eps_disable=True,
                  activation="relu", n=3, munch_alpha=0.9,
@@ -127,7 +127,7 @@ class Agent:
 
         self.layer_norm = layer_norm
 
-        self.loading_checkpoint = False
+        self.loading_checkpoint = True
 
         self.per_beta = 0.45
         self.per_beta_anneal = per_beta_anneal
@@ -141,7 +141,7 @@ class Agent:
         if self.testing:
             self.min_sampling_size = 4000
         else:
-            self.min_sampling_size = 200000
+            self.min_sampling_size = 100000
 
         self.lr = lr
 
@@ -212,14 +212,15 @@ class Agent:
         self.num_tau = taus
 
         if self.loading_checkpoint:
-            self.min_sampling_size = 300000
+            self.min_sampling_size = 100000
 
         # c51
         self.Vmax = 10
         self.Vmin = -10
         self.N_ATOMS = 51
 
-        if not self.loading_checkpoint and not self.testing:
+        # if not self.loading_checkpoint and not self.testing:
+        if not self.testing:
             self.eps_start = 1.0
             # divided by 4 is due to frameskip
             self.eps_steps = eps_steps
@@ -269,7 +270,7 @@ class Agent:
         self.eval_mode = False
 
         if self.loading_checkpoint:
-            self.load_models("C:/Users/offan/Downloads/4398_Beyond_The_Rainbow_High_P_Supplementary Material/BeyondTheRainbowICLR/BTR_Breakout200M_30/BTR_Breakout200M_4M.model")
+            self.load_models("C:/Users/offan/Downloads/4398_Beyond_The_Rainbow_High_P_Supplementary Material/BeyondTheRainbowICLR/output/BTR_Mario200M_3/BTR_Mario200M_3M.model")
 
         self.all_grad_mag = 0
         self.tot_churns = 0
