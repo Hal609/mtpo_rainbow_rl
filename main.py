@@ -120,7 +120,7 @@ def main():
     parser.add_argument('--include_evals', type=int, default=1)
     parser.add_argument('--eval_envs', type=int, default=3)
     parser.add_argument('--life_info', type=int, default=0)
-    parser.add_argument('--num_eval_episodes', type=int, default=100)
+    parser.add_argument('--num_eval_episodes', type=int, default=50)
     parser.add_argument('--analy', type=int, default=False)
     parser.add_argument('--framestack', type=int, default=4)
     parser.add_argument('--sticky', type=int, default=1)
@@ -256,7 +256,7 @@ def main():
         num_envs = envs
         eval_envs = args.eval_envs
         n_steps = frames
-        eval_every = 250000
+        eval_every = 500000
     next_eval = eval_every
 
     print("Currently Playing Game: " + str(game))

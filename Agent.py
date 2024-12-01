@@ -219,16 +219,16 @@ class Agent:
         self.Vmin = -10
         self.N_ATOMS = 51
 
-        # if not self.loading_checkpoint and not self.testing:
-        if not self.testing:
+        if not self.loading_checkpoint and not self.testing:
+        # if not self.testing:
             self.eps_start = 1.0
             # divided by 4 is due to frameskip
             self.eps_steps = eps_steps
             self.eps_final = 0.01
         else:
-            self.eps_start = 0.00
+            self.eps_start = 0.01
             self.eps_steps = eps_steps
-            self.eps_final = 0.00
+            self.eps_final = 0.01
 
         self.eps_disable = eps_disable
         self.epsilon = EpsilonGreedy(self.eps_start, self.eps_steps, self.eps_final, self.action_space)
@@ -270,7 +270,7 @@ class Agent:
         self.eval_mode = False
 
         if self.loading_checkpoint:
-            self.load_models("C:/Users/offan/Downloads/4398_Beyond_The_Rainbow_High_P_Supplementary Material/BeyondTheRainbowICLR/output/BTR_Mario200M_3/BTR_Mario200M_3M.model")
+            self.load_models("C:/Users/offan/Downloads/4398_Beyond_The_Rainbow_High_P_Supplementary Material/BeyondTheRainbowICLR/output/BTR_Mario200M_5/BTR_Mario200M_3.5M.model")
 
         self.all_grad_mag = 0
         self.tot_churns = 0
@@ -332,7 +332,7 @@ class Agent:
         self.tgt_net.load_state_dict(self.net.state_dict())
 
     def save_model(self):
-        self.net.save_checkpoint(self.agent_name + "_" + str(int((self.env_steps // 250000))) + "M")
+        self.net.save_checkpoint(self.agent_name + "_" + str(round((self.env_steps / 1000000), 2)) + "M")
 
     def load_models(self, name):
         self.net.load_checkpoint(name)
