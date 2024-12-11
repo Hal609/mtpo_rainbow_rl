@@ -91,7 +91,7 @@ class Agent:
                  discount=0.997, per=True,
                  taus=8, model_size=2, linear_size=512, ncos=64, rainbow=False, maxpool=True,
                  non_factorised=False, replay_period=1, analytics=True, framestack=4,
-                 rgb=False, imagex=128, imagey=128, arch='impala', per_alpha=0.2,
+                 rgb=False, imagex=84, imagey=84, arch='impala', per_alpha=0.2,
                  per_beta_anneal=False, layer_norm=False, max_mem_size=1048576, c51=False,
                  eps_steps=2000000, eps_disable=True,
                  activation="relu", n=3, munch_alpha=0.9,
@@ -227,7 +227,7 @@ class Agent:
             self.eps_final = 0.01
         else:
             self.eps_start = 0.01
-            self.eps_steps = eps_steps
+            self.eps_steps = eps_steps / 0.65
             self.eps_final = 0.01
 
         self.eps_disable = eps_disable
@@ -270,7 +270,7 @@ class Agent:
         self.eval_mode = False
 
         if self.loading_checkpoint:
-            self.load_models("C:/Users/offan/Downloads/4398_Beyond_The_Rainbow_High_P_Supplementary Material/BeyondTheRainbowICLR/output/BTR_Mario200M_5/BTR_Mario200M_3.5M.model")
+            self.load_models("C:/Users/offan/Downloads/4398_Beyond_The_Rainbow_High_P_Supplementary Material/BeyondTheRainbowICLR/output/BTR_MTPO120M_21/BTR_MTPO120M_9.0M.model")
 
         self.all_grad_mag = 0
         self.tot_churns = 0

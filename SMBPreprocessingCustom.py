@@ -21,7 +21,7 @@ class SMBPreprocessingCustom(gym.Wrapper, gym.utils.RecordConstructorArgs):
         self,
         env: gym.Env,
         frame_skip: int = 4,
-        screen_size: int = 128,
+        screen_size: int = 84,
         terminal_on_life_loss: bool = False,
         life_information: bool = True,
         grayscale_obs: bool = True,
@@ -139,9 +139,22 @@ class SMBPreprocessingCustom(gym.Wrapper, gym.utils.RecordConstructorArgs):
         if self.grayscale_obs and self.obs_buffer[0].ndim == 3:
             self.obs_buffer[0] = cv2.cvtColor(self.obs_buffer[0], cv2.COLOR_RGB2GRAY)
 
-        # Resize the observation
+        # **Center Crop to 84x84 region**
+        original_height, original_width = self.obs_buffer[0].shape[:2]
+        crop_height, crop_width = 168, 168  # Desired crop size
+
+        # Calculate cropping coordinates
+        top = (original_height - crop_height) // 2
+        left = (original_width - crop_width) // 2
+        bottom = top + crop_height
+        right = left + crop_width
+
+        # Crop the center of the observation
+        cropped_obs = self.obs_buffer[0][top:bottom, left:right]
+        
+        # Resize the cropped observation
         obs = cv2.resize(
-            self.obs_buffer[0],
+            cropped_obs,
             (self.screen_size, self.screen_size),
             interpolation=cv2.INTER_AREA,
         )

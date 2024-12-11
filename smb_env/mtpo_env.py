@@ -3,11 +3,24 @@ from collections import defaultdict
 import gymnasium as gym
 from .cynes_env import NESEnv
 import numpy as np
+from enum import Flag
+import random
 
 _STATUS_MAP = defaultdict(lambda: 'fireball', {0: 'small', 1: 'tall'})
 _BUSY_STATES = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x07]
 _ENEMY_TYPE_ADDRESSES = [0x0016, 0x0017, 0x0018, 0x0019, 0x001A]
 _STAGE_OVER_ENEMIES = np.array([0x2D, 0x31])
+
+NES_INPUT_RIGHT = 0x01
+NES_INPUT_LEFT = 0x02
+NES_INPUT_DOWN = 0x04
+NES_INPUT_UP = 0x08
+NES_INPUT_START = 0x10
+NES_INPUT_SELECT = 0x20
+NES_INPUT_B = 0x40
+NES_INPUT_A = 0x80
+
+FIGHT_IDS = [] # Don1=48,KH=35,Soda=28,Von&Tyson=32,PH2&Glass=0 
 
 def reverse_bits(n):
     result = 0
@@ -32,20 +45,29 @@ class PunchOutEnv(NESEnv):
         super().__init__(rom_path, headless=headless)
 
         # Existing initialization code...
-        self.action_space = gym.spaces.Discrete(4)  # Only four actions
+        self.action_space = gym.spaces.Discrete(6)
 
         # Define the reduced action mapping
-        self._action_map = [int("10000001", 2), int("10000000", 2), int("10000011", 2), int("10000010", 2)]  # Corresponds to Left and Left+Jump
+        self._action_map = [0, NES_INPUT_START, NES_INPUT_LEFT, NES_INPUT_B, NES_INPUT_B | NES_INPUT_UP, NES_INPUT_DOWN]  # Corresponds to Left and Left+Jump
+
+
+        self.first_fight = 0 #random.randint(0, 4)
+        print(self.first_fight)
 
         # Initialize any additional variables
         self._time_last = 0
-        self._x_position_last = 0
+        self._mac_hp_last = 0
+        self._opp_down_count_last = 0
+        self._opp_hp_last = 0
+        self._opp_id_last = 0
+
+        self.was_hit = False
 
         self._target_world, self._target_stage, self._target_area = None, None, None
         # Reset the emulator
         self.reset()
         # Skip the start screen
-        self._skip_start_screen()
+        self.skip_start_screen()
         # Create a backup state to restore from on subsequent calls to reset
         self._backup()
     
@@ -53,7 +75,7 @@ class PunchOutEnv(NESEnv):
         if self.done:
             raise ValueError('Cannot step in a done environment! Call `reset` first.')
         
-        self.nes.controller = reverse_bits(self._action_map[action])
+        self.nes.controller = self._action_map[action]
         frame = self.nes.step(frames=1)
 
         obs = np.array(frame, dtype=np.uint8)
@@ -94,6 +116,41 @@ class PunchOutEnv(NESEnv):
         return int(''.join(map(str, [self.ram[address + i] for i in range(length)])))
     
     @property
+    def _in_fight(self):
+        '''Return the current round number.'''
+        return self.ram[0x0004] == 0xFF
+    
+    @property
+    def _round(self):
+        '''Return the current round number.'''
+        return self.ram[0x0006]
+    
+    @property
+    def _opp_id(self):
+        '''Return the current fight id.'''
+        return self.ram[0x0001]
+    
+    @property
+    def _mac_health(self):
+        '''Return the Mac's current HP'''
+        return self.ram[0x0391]
+
+    @property
+    def _opp_health(self):
+        '''Return the opponant's current HP'''
+        return self.ram[0x0398]
+    
+    @property
+    def _mac_down_count(self):
+        '''Return the number of times Mac has been knocked down'''
+        return self.ram[0x03D0]
+    
+    @property
+    def _opp_down_count(self):
+        '''Return the number of times opponant has been knocked down'''
+        return self.ram[0x03D1]
+    
+    @property
     def _level(self):
         """Return the level of the game."""
         return self.ram[0x075f] * 4 + self.ram[0x075c]
@@ -123,7 +180,7 @@ class PunchOutEnv(NESEnv):
     def _time(self):
         """Return the time left (0 to 999)."""
         # time is represented as a figure with 3 10's places
-        return self._read_mem_range(0x07f8, 3)
+        return 60*self.ram[0x0302] + 10*self.ram[0x0304] + self.ram[0x0305]
 
     @property
     def _coins(self):
@@ -134,7 +191,7 @@ class PunchOutEnv(NESEnv):
     @property
     def _life(self):
         """Return the number of remaining lives."""
-        return self.ram[0x075a]
+        return self.ram[0x075a] 
 
     @property
     def _x_position(self):
@@ -281,28 +338,30 @@ class PunchOutEnv(NESEnv):
             self._runout_prelevel_timer()
             self._frame_advance(0)
 
-    def _skip_start_screen(self):
+    def skip_start_screen(self):
         """Press and release start to skip the start screen."""
         # press and release the start button
-        self._frame_advance(8)
-        self._frame_advance(0)
+        for i in range(300):
+            self.ram[0x0001] = self.first_fight
+            self._frame_advance(0)
+            self._frame_advance(NES_INPUT_START)
+            self._frame_advance(NES_INPUT_START)
         # Press start until the game starts
         while self._time == 0:
             # press and release the start button
-            self._frame_advance(8)
-            # if we're in the single stage, environment, write the stage data
-            if self.is_single_stage_env:
-                self._write_stage()
             self._frame_advance(0)
+            # if we're in the single stage, environment, write the stage data
+            # if self.is_single_stage_env:
+            #     self._write_stage()
             # run-out the prelevel timer to skip the animation
-            self._runout_prelevel_timer()
+            # self._runout_prelevel_timer()
         # set the last time to now
         self._time_last = self._time
         # after the start screen idle to skip some extra frames
-        while self._time >= self._time_last:
-            self._time_last = self._time
-            self._frame_advance(8)
-            self._frame_advance(0)
+        # while self._time >= self._time_last:
+        #     self._time_last = self._time
+        #     self._frame_advance(NES_INPUT_START)
+        #     self._frame_advance(0)
 
     def _skip_end_of_world(self):
         """Skip the cutscene that plays at the end of a world."""
@@ -314,6 +373,15 @@ class PunchOutEnv(NESEnv):
                 # frame advance with NOP
                 self._frame_advance(0)
 
+    def skip_between_rounds(self):
+        while (not self._in_fight) or self._time == self._time_last or self._time == 0:
+            self._time_last = self._time
+            self._frame_advance(0)
+            self._frame_advance(0)
+            self._frame_advance(NES_INPUT_START)
+            self._frame_advance(NES_INPUT_START)
+
+
     def _kill_mario(self):
         """Skip a death animation by forcing Mario to death."""
         # force Mario's state to dead
@@ -324,16 +392,38 @@ class PunchOutEnv(NESEnv):
     # MARK: Reward Function
 
     @property
-    def _x_reward(self):
-        """Return the reward based on left right movement between steps."""
-        _reward = self._x_position - self._x_position_last
-        self._x_position_last = self._x_position
+    def _health_penalty(self):
+        """Return the """
+        _reward = self._mac_health - self._mac_hp_last
+        self.was_hit = _reward != 0
+        self._mac_hp_last = self._mac_health
         return _reward
+    
+    @property
+    def _hit_reward(self):
+        """Return the reward based on left right movement between steps."""
+        _reward = self._opp_hp_last - self._opp_health
+        self._opp_hp_last = self._opp_health
+        return _reward
+    
+    @property
+    def _ko_reward(self):
+        """Return the reward based on left right movement between steps."""
+        _reward = self._opp_down_count - self._opp_down_count_last
+        self._opp_down_count_last = self._opp_down_count
+        return _reward
+    
+    @property
+    def _next_opp_reward(self):
+        """Return the reward based on left right movement between steps."""
+        _reward = self._opp_id_last != self._opp_id
+        self._opp_id_last = self._opp_id
+        return int(_reward)
 
     @property
     def _time_penalty(self):
         """Return the reward for the in-game clock ticking."""
-        _reward = self._time - self._time_last
+        _reward = self._time_last - self._time
         self._time_last = self._time
         # time can only decrease, a positive reward results from a reset and
         # should default to 0 reward
@@ -355,12 +445,19 @@ class PunchOutEnv(NESEnv):
     def _will_reset(self):
         """Handle and RAM hacking before a reset occurs."""
         self._time_last = 0
-        self._x_position_last = 0
+        self._mac_hp_last = 0
+        self._opp_down_count_last = 0
+        self._opp_hp_last = 0
+        self._opp_id_last = 0
+        self.ram[0x0001] = random.randint(0,5)
 
     def _did_reset(self):
         """Handle any RAM hacking after a reset occurs."""
         self._time_last = self._time
-        self._x_position_last = self._x_position
+        self._mac_hp_last = self._mac_health
+        self._opp_down_count_last = self._opp_down_count
+        self._opp_hp_last = self._opp_health
+        self._opp_id_last = self._opp_id
 
     def _did_step(self, done):
         """
@@ -376,27 +473,21 @@ class PunchOutEnv(NESEnv):
         # if done flag is set a reset is incoming anyway, ignore any hacking
         if done:
             return
-        # if mario is dying, then cut to the chase and kill hi,
-        if self._is_dying:
-            self._kill_mario()
-        # skip world change scenes (must call before other skip methods)
-        if not self.is_single_stage_env:
-            self._skip_end_of_world()
-        # skip area change (i.e. enter pipe, flag get, etc.)
-        self._skip_change_area()
-        # skip occupied states like the black screen between lives that shows
-        # how many lives the player has left
-        self._skip_occupied_states()
+        if not self._in_fight:
+            self.skip_between_rounds()
 
     def get_reward(self):
         """Return the reward after a step occurs."""
-        return self._x_reward + self._time_penalty + self._death_penalty
+        # print("\ntime penalty", self._time_penalty)
+        # print("hit reward", self._hit_reward)
+        return (15*self._next_opp_reward) + (2*self._ko_reward) + (self._time_penalty)*0.1 + self._hit_reward + self._health_penalty
 
     def _get_done(self):
         """Return True if the episode is over, False otherwise."""
         # if self.is_single_stage_env:
         # return self._is_dying or self._is_dead or self._flag_get
-        return self._is_game_over
+        return self.was_hit
+        return self._mac_down_count > 0 or self._round > 1
 
     def _get_info(self):
         """Return the info after a step occurs"""

@@ -131,7 +131,7 @@ class NESEnv(gym.Env):
         """
 
         # Set the controller inputs
-        self.nes.controller = reverse_bits(action)
+        self.nes.controller = action
         # Advance the emulator by one frame
         frame = self.nes.step(frames=1)
         # Update the current frame (observation)

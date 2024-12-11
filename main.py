@@ -11,21 +11,21 @@ from SMBPreprocessingCustom import SMBPreprocessingCustom
 from functools import partial
 from matplotlib import pyplot as plt
 
-from smb_env.smb_env_cynes import SuperMarioBrosEnv
+from smb_env.mtpo_env import PunchOutEnv
 
 def make_env(envs_create, game, life_info, framestack, repeat_probs, headless=True):
     rom_path = (
         "C:/Users/offan/Downloads/4398_Beyond_The_Rainbow_High_P_Supplementary Material/"
-        "BeyondTheRainbowICLR/smb_env/super-mario-bros.nes"
+        "BeyondTheRainbowICLR/smb_env/punch.nes"
     )
     print(f"Creating {envs_create} envs")
 
     def create_env():
         gym.register(
-            id="gymnasium_env/smb-v5",
-            entry_point=SuperMarioBrosEnv,
+            id="gymnasium_env/mtpo-v5",
+            entry_point=PunchOutEnv,
         )
-        env = SMBPreprocessingCustom(gym.make("gymnasium_env/smb-v5", rom_path=rom_path, headless=headless))
+        env = SMBPreprocessingCustom(gym.make("gymnasium_env/mtpo-v5", rom_path=rom_path, headless=headless))
 
         return gym.wrappers.FrameStack(env, num_stack=framestack, lz4_compress=False)
     
@@ -111,11 +111,11 @@ def main():
     parser = argparse.ArgumentParser()
 
     # environment setup
-    parser.add_argument('--game', type=str, default="Mario")
-    parser.add_argument('--envs', type=int, default=38)
+    parser.add_argument('--game', type=str, default="MTPO")
+    parser.add_argument('--envs', type=int, default=36)
     parser.add_argument('--bs', type=int, default=256)
     parser.add_argument('--rr', type=float, default=1)
-    parser.add_argument('--frames', type=int, default=200000000)
+    parser.add_argument('--frames', type=int, default=120000000)
     parser.add_argument('--repeat', type=int, default=0)
     parser.add_argument('--include_evals', type=int, default=1)
     parser.add_argument('--eval_envs', type=int, default=3)
@@ -155,7 +155,7 @@ def main():
     parser.add_argument('--per_alpha', type=float, default=0.2)
     parser.add_argument('--per_beta_anneal', type=int, default=0)
     parser.add_argument('--layer_norm', type=int, default=0)
-    parser.add_argument('--eps_steps', type=int, default=2000000)
+    parser.add_argument('--eps_steps', type=int, default=10000000)
     parser.add_argument('--eps_disable', type=int, default=1)
     parser.add_argument('--activation', type=str, default="relu")
 
@@ -270,7 +270,7 @@ def main():
     n_actions = env.action_space[0].n
     print(f"Env has {n_actions} actions")
 
-    agent = Agent(n_actions=env.action_space[0].n, input_dims=[framestack, 128, 128], device=device, num_envs=num_envs,
+    agent = Agent(n_actions=env.action_space[0].n, input_dims=[framestack, 84, 84], device=device, num_envs=num_envs,
                   agent_name=agent_name, total_frames=n_steps, testing=testing, batch_size=bs, rr=rr, lr=lr,
                   maxpool_size=maxpool_size, target_replace=c,
                   noisy=noisy, spectral=spectral, munch=munch, iqn=iqn, double=double, dueling=dueling, impala=impala,
@@ -293,7 +293,7 @@ def main():
 
     if testing:
         from torchsummary import summary
-        summary(agent.net, (framestack, 128, 128))
+        summary(agent.net, (framestack, 84, 84))
 
     while steps < n_steps:
         steps += num_envs
@@ -323,7 +323,7 @@ def main():
         if steps % 1200 == 0 and len(scores) > 0:
             avg_score = np.mean(scores_temp[-50:])
             if episodes % 1 == 0:
-                print('{} {} avg score {:.2f} total_steps {:.0f} fps {:.2f} games {} epsi {}'
+                print('{} {} avg score {:.5f} total_steps {:.0f} fps {:.2f} games {} epsi {}'
                       .format(agent_name, game, avg_score, steps, (steps - last_steps) / (time.time() - last_time), episodes, round(agent.epsilon.eps, 3)),
                       flush=True)
                 last_steps = steps
