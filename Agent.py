@@ -9,7 +9,7 @@ import torch.optim as optim
 import numpy as np
 from PER import PER
 # from torchsummary import summary
-from networks import ImpalaCNNLarge, ImpalaCNNLargeIQN, NatureIQN, ImpalaCNNLargeC51, FactorizedNoisyLinear
+from networks import ImpalaCNNLargeIQN
 import networks
 from copy import deepcopy
 from functools import partial
@@ -70,17 +70,6 @@ def create_network(impala, iqn, input_dims, n_actions, spectral_norm, device, no
                                      maxpool=maxpool, model_size=model_size, num_tau=num_tau, maxpool_size=maxpool_size,
                                      dueling=dueling, linear_size=linear_size, ncos=ncos,
                                      arch=arch, layer_norm=layer_norm, activation=activation)
-        if c51:
-            return ImpalaCNNLargeC51(input_dims[0], n_actions, spectral=spectral_norm, device=device,
-                                  noisy=noisy, maxpool=maxpool, model_size=model_size, linear_size=linear_size)
-        else:
-            return ImpalaCNNLarge(input_dims[0], n_actions, spectral=spectral_norm, device=device,
-                                  noisy=noisy, maxpool=maxpool, model_size=model_size, maxpool_size=maxpool_size,
-                                  linear_size=linear_size)
-
-    else:
-        return NatureIQN(input_dims[0], n_actions, device=device, noisy=noisy, num_tau=num_tau, linear_size=linear_size,
-                         non_factorised=non_factorised, dueling=dueling)
 
 
 
@@ -97,23 +86,7 @@ class Agent:
                  activation="relu", n=3, munch_alpha=0.9,
                  grad_clip=10):
 
-        if rainbow:
-            lr = 6.25e-5
-            spectral = False
-            munch = False
-            iqn = False
-            c51 = True
-            double = True
-            dueling = True
-            impala = False
-            discount = 0.99
-            adamw = False
-            per = True
-            noisy = True
-            linear_size = 512
-            self.per_alpha = 0.5
-        else:
-            self.per_alpha = per_alpha
+        self.per_alpha = per_alpha
 
         self.procgen = True if input_dims[1] == 64 else False
         self.grad_clip = grad_clip
@@ -226,9 +199,9 @@ class Agent:
             self.eps_steps = eps_steps
             self.eps_final = 0.01
         else:
-            self.eps_start = 0.01
+            self.eps_start = 0.00
             self.eps_steps = eps_steps / 0.65
-            self.eps_final = 0.01
+            self.eps_final = 0.00
 
         self.eps_disable = eps_disable
         self.epsilon = EpsilonGreedy(self.eps_start, self.eps_steps, self.eps_final, self.action_space)
@@ -270,7 +243,7 @@ class Agent:
         self.eval_mode = False
 
         if self.loading_checkpoint:
-            self.load_models("C:/Users/offan/Downloads/4398_Beyond_The_Rainbow_High_P_Supplementary Material/BeyondTheRainbowICLR/output/BTR_MTPO120M_21/BTR_MTPO120M_9.0M.model")
+            self.load_models("/Users/hal/rainbow_nes_rl/output/BTR_MTPO120M_21/BTR_MTPO120M_28.5M.model")
 
         self.all_grad_mag = 0
         self.tot_churns = 0
@@ -317,7 +290,6 @@ class Agent:
             return x
 
     def store_transition(self, state, action, reward, next_state, done, stream, prio=True):
-
         if self.rgb:
             # expand dims to create "framestack" dim, so it works with my replay buffer
             state = np.expand_dims(state, axis=0)
