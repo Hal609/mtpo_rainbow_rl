@@ -9,7 +9,7 @@ git clone git@github.com:Hal609/rainbow_nes_rl.git
 cd rainbow_nes_rl
 ```
 
-Then install the dependencies with requirements.txt file:
+Then install the dependencies with the requirements.txt file:
 
 ```Bash
 pip install -r requirements.txt
