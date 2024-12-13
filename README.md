@@ -5,7 +5,11 @@ This repo includes a Gymnasium environment for MTPO using cynes as the backend e
 To run the completed model, first install our the dependencies with requirements.txt file:
 
 ```Bash
-run: pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 
 Then the environment can be run from main.py
+
+```Python
+python main.py
+```
