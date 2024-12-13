@@ -43,17 +43,6 @@ class NESEnv(gym.Env):
     # the legal range for rewards for this environment
     reward_range = (-float(15), float(15))
 
-    # observation space for the environment is static across all instances
-    # observation_space = Box(
-    #     low=0,
-    #     high=255,
-    #     shape=SCREEN_SHAPE_24_BIT,
-    #     dtype=np.uint8
-    # )
-
-    # action space is a bitmap of button press values for the 8 NES buttons
-    # action_space = Discrete(256)
-
     def __init__(self, rom_path, headless=False):
         # create a ROM file from the ROM path
         rom = ROM(rom_path)
@@ -73,10 +62,6 @@ class NESEnv(gym.Env):
         self._has_backup = False
         # setup a done flag
         self.done = True
-        # setup the controllers, screen, and RAM buffers
-        # self.controllers = [self._controller_buffer(port) for port in range(2)]
-        # self.screen = self._screen_buffer()
-        # self.ram = self._ram_buffer()
 
         self.headless = headless
         self.nes = NES(self._rom_path) if self.headless else WindowedNES(self._rom_path)
@@ -136,10 +121,5 @@ class NESEnv(gym.Env):
         frame = self.nes.step(frames=1)
         # Update the current frame (observation)
         self.screen = frame
-
-    # def close(self):
-    #     # self.nes.close()
-    #     if hasattr(self, 'window'):
-    #         self.window.close()
 
 
