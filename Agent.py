@@ -5,11 +5,11 @@ class Agent:
     def __init__(self, n_actions, input_dims, device, num_envs, agent_name, total_frames):
 
         self.net = ImpalaCNNLargeIQN(input_dims[0], n_actions, spectral=True, device=device, noisy=True,
-                                     maxpool=True, model_size=2, num_tau=8, maxpool_size=6,
+                                     maxpool=True, model_size=3, num_tau=8, maxpool_size=6,
                                      dueling=True, linear_size=512, ncos=64,
                                      arch="impala", layer_norm=False, activation="relu")
 
-        self.net.load_checkpoint("/Users/hal/rainbow_nes_rl/output/BTR_MTPO120M_21/BTR_MTPO120M_28.5M.model")
+        self.net.load_checkpoint("output/BTR_MTPO120M_5.8M.model")
 
     def choose_action(self, observation):
         with T.no_grad():

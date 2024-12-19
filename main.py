@@ -4,11 +4,11 @@ import gymnasium as gym
 from Agent import Agent
 from MTPOPreprocessingCustom import MTPOPreprocessingCustom
 
-from smb_env.mtpo_env import PunchOutEnv
+from nes_env.mtpo_env import PunchOutEnv
 
 def make_env(envs_create, framestack, headless=True):
     rom_path = (
-        "/Users/hal/rainbow_nes_rl/smb_env/punch.nes"
+        "nes_env/punch.nes"
     )
     print(f"Creating {envs_create} envs")
 
@@ -19,7 +19,7 @@ def make_env(envs_create, framestack, headless=True):
         )
         env = MTPOPreprocessingCustom(gym.make("gymnasium_env/mtpo-v5", rom_path=rom_path, headless=headless))
 
-        return gym.wrappers.FrameStack(env, num_stack=framestack, lz4_compress=False)
+        return gym.wrappers.FrameStackObservation(env, stack_size=framestack)
     
     return gym.vector.AsyncVectorEnv(
         [lambda: create_env() for _ in range(envs_create)],
