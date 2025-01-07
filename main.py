@@ -42,7 +42,9 @@ def main():
     for process in processes:
         process.join()
 
-    print("Evaluations finished, job completed successfully!")
+    print("Finished, job completed successfully!")
+
+    env.close()
 
 
 if __name__ == '__main__':
