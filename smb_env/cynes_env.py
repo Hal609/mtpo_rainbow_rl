@@ -41,7 +41,7 @@ class NESEnv(gym.Env):
     }
 
     # the legal range for rewards for this environment
-    reward_range = (-float(15), float(15))
+    reward_range = (-float(30), float(30))
 
     # observation space for the environment is static across all instances
     # observation_space = Box(

@@ -335,5 +335,5 @@ class ImpalaCNNLargeIQN(nn.Module):
         torch.save(self.state_dict(), name + ".model")
 
     def load_checkpoint(self, name):
-        self.load_state_dict(torch.load(name, map_location=torch.device('cpu')))
+        self.load_state_dict(torch.load(name, weights_only=True))
 

@@ -117,10 +117,10 @@ def main():
     parser.add_argument('--rr', type=float, default=1)
     parser.add_argument('--frames', type=int, default=120000000)
     parser.add_argument('--repeat', type=int, default=0)
-    parser.add_argument('--include_evals', type=int, default=1)
-    parser.add_argument('--eval_envs', type=int, default=3)
+    parser.add_argument('--include_evals', type=int, default=0)
+    parser.add_argument('--eval_envs', type=int, default=1)
     parser.add_argument('--life_info', type=int, default=0)
-    parser.add_argument('--num_eval_episodes', type=int, default=50)
+    parser.add_argument('--num_eval_episodes', type=int, default=1)
     parser.add_argument('--analy', type=int, default=False)
     parser.add_argument('--framestack', type=int, default=4)
     parser.add_argument('--sticky', type=int, default=1)
@@ -148,7 +148,7 @@ def main():
     parser.add_argument('--c', type=int, default=500)
     parser.add_argument('--dueling', type=int, default=1)
     parser.add_argument('--linear_size', type=int, default=512)
-    parser.add_argument('--model_size', type=float, default=2)
+    parser.add_argument('--model_size', type=float, default=4)
 
     parser.add_argument('--double', type=int, default=0)
     parser.add_argument('--ncos', type=int, default=64)
@@ -321,6 +321,7 @@ def main():
         observation = observation_
 
         if steps % 1200 == 0 and len(scores) > 0:
+            print(f"Memory usage: {torch.cuda.memory_allocated()} / {torch.cuda.max_memory_allocated()}")
             avg_score = np.mean(scores_temp[-50:])
             if episodes % 1 == 0:
                 print('{} {} avg score {:.5f} total_steps {:.0f} fps {:.2f} games {} epsi {}'

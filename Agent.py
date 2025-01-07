@@ -100,7 +100,7 @@ class Agent:
 
         self.layer_norm = layer_norm
 
-        self.loading_checkpoint = True
+        self.loading_checkpoint = False
 
         self.per_beta = 0.45
         self.per_beta_anneal = per_beta_anneal
@@ -184,24 +184,24 @@ class Agent:
 
         self.num_tau = taus
 
-        if self.loading_checkpoint:
-            self.min_sampling_size = 100000
+        # if self.loading_checkpoint:
+        #     self.min_sampling_size = 100000
 
         # c51
         self.Vmax = 10
         self.Vmin = -10
         self.N_ATOMS = 51
 
-        if not self.loading_checkpoint and not self.testing:
-        # if not self.testing:
-            self.eps_start = 1.0
-            # divided by 4 is due to frameskip
-            self.eps_steps = eps_steps
-            self.eps_final = 0.01
-        else:
-            self.eps_start = 0.00
-            self.eps_steps = eps_steps / 0.65
-            self.eps_final = 0.00
+        # if not self.loading_checkpoint and not self.testing:
+        # # if not self.testing:
+        #     self.eps_start = 1.0
+        #     # divided by 4 is due to frameskip
+        #     self.eps_steps = eps_steps
+        #     self.eps_final = 0.01
+        # else:
+        self.eps_start = 1.0
+        self.eps_steps = eps_steps
+        self.eps_final = 0.01
 
         self.eps_disable = eps_disable
         self.epsilon = EpsilonGreedy(self.eps_start, self.eps_steps, self.eps_final, self.action_space)
@@ -242,8 +242,8 @@ class Agent:
         self.replay_ratio_cnt = 0
         self.eval_mode = False
 
-        if self.loading_checkpoint:
-            self.load_models("/Users/hal/rainbow_nes_rl/output/BTR_MTPO120M_21/BTR_MTPO120M_28.5M.model")
+        # if self.loading_checkpoint:
+        # self.load_models("C:/Users/offan/Downloads/4398_Beyond_The_Rainbow_High_P_Supplementary Material/BeyondTheRainbowICLR/output/BTR_MTPO120M_54/BTR_MTPO120M_2.5M.model")
 
         self.all_grad_mag = 0
         self.tot_churns = 0

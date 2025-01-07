@@ -61,10 +61,10 @@ class PunchOutEnv(NESEnv):
         self.action_space = gym.spaces.Discrete(6)
 
         # Define the reduced action mapping
-        self._action_map = [0, NES_INPUT_START, NES_INPUT_LEFT, NES_INPUT_B, NES_INPUT_B | NES_INPUT_UP, NES_INPUT_DOWN]  # Corresponds to Left and Left+Jump
+        self._action_map = [0, NES_INPUT_START, NES_INPUT_LEFT, NES_INPUT_B, NES_INPUT_B | NES_INPUT_UP, NES_INPUT_DOWN] 
 
-        self.first_fight = 0 #random.randint(0, 4)
-        print(self.first_fight)
+        self.first_fight = random.randint(0, 6)
+        print(f"Creating environment at fight {self.first_fight}: {FIGHT_DICT[self.first_fight]}.")
 
         # Initialize any additional variables
         self._time_last = 0
@@ -72,18 +72,18 @@ class PunchOutEnv(NESEnv):
         self._opp_down_count_last = 0
         self._opp_hp_last = 0
         self._opp_id_last = 0
+        self._mac_down_count_last = 0
 
         self.was_hit = False
 
         # Reset the emulator
-        # self.reset()
+        self.reset()
         # Skip the start screen
-        # self.skip_start_screen()
+        self.skip_start_screen()
         # Create a backup state to restore from on subsequent calls to reset
-        # self._backup()
+        self._backup()
 
         self.last_time = time.time()
-        print("Finished init")
     
     def step(self, action):
         if self.done:
@@ -109,10 +109,6 @@ class PunchOutEnv(NESEnv):
         elif reward > self.reward_range[1]:
             reward = self.reward_range[1]
 
-        if (1/60 - (time.time() - self.last_time)) > 0:
-            time.sleep(1/60 - (time.time() - self.last_time))
-        self.last_time = time.time()
-
         return obs, reward, self.done, truncated, info
 
     # MARK: Memory access
@@ -130,7 +126,7 @@ class PunchOutEnv(NESEnv):
 
         """
         return int(''.join(map(str, [self.ram[address + i] for i in range(length)])))
-    
+
     @property
     def _in_fight(self):
         '''Return the current round number.'''
@@ -165,6 +161,16 @@ class PunchOutEnv(NESEnv):
     def _opp_down_count(self):
         '''Return the number of times opponant has been knocked down'''
         return self.ram[0x03D1]
+    
+    @property
+    def _mac_losses(self):
+        '''Return the number of losses Mac has suffered.'''
+        return self.ram[0x000A]
+    
+    @property
+    def _mac_down_count(self):
+        '''Returns the number of times Mac has been knocked down.'''
+        return self.ram[0x03D0]
     
     @property
     def _level(self):
@@ -205,26 +211,13 @@ class PunchOutEnv(NESEnv):
         # press and release the start button
         for i in range(300):
             self.ram[0x0001] = self.first_fight
-            start_time = time.time()
             self._frame_advance(0)
-            if 1/60 - (time.time() - start_time) > 0:
-                time.sleep(1/60 - (time.time() - start_time))
-            start_time = time.time()
             self._frame_advance(NES_INPUT_START)
-            if 1/60 - (time.time() - start_time) > 0:
-                time.sleep(1/60 - (time.time() - start_time))
-            start_time = time.time()
             self._frame_advance(NES_INPUT_START)
-            if 1/60 - (time.time() - start_time) > 0:
-                time.sleep(1/60 - (time.time() - start_time))
         # Press start until the game starts
         while self._time == 0:
             # press and release the start button
-            start_time = time.time()
             self._frame_advance(0)
-            if 1/60 - (time.time() - start_time) > 0:
-                time.sleep(1/60 - (time.time() - start_time))
-            start_time = time.time()
         self._time_last = self._time
 
 
@@ -241,22 +234,10 @@ class PunchOutEnv(NESEnv):
     def skip_between_rounds(self):
         while (not self._in_fight) or self._time == self._time_last or self._time == 0:
             self._time_last = self._time
-            start_time = time.time()
             self._frame_advance(0)
-            if 1/60 - (time.time() - start_time) > 0:
-                time.sleep(1/60 - (time.time() - start_time))
-            start_time = time.time()
             self._frame_advance(0)
-            if 1/60 - (time.time() - start_time) > 0:
-                time.sleep(1/60 - (time.time() - start_time))
-            start_time = time.time()
             self._frame_advance(NES_INPUT_START)
-            if 1/60 - (time.time() - start_time) > 0:
-                time.sleep(1/60 - (time.time() - start_time))
-            start_time = time.time()
             self._frame_advance(NES_INPUT_START)
-            if 1/60 - (time.time() - start_time) > 0:
-                time.sleep(1/60 - (time.time() - start_time))
 
     # MARK: Reward Function
 
@@ -266,6 +247,13 @@ class PunchOutEnv(NESEnv):
         _reward = self._mac_health - self._mac_hp_last
         self.was_hit = _reward != 0
         self._mac_hp_last = self._mac_health
+        return _reward
+    
+    @property
+    def _downed_penalty(self):
+        """Return the """
+        _reward = self._mac_down_count_last - self._mac_down_count
+        self._mac_down_count_last = self._mac_down_count
         return _reward
     
     @property
@@ -309,8 +297,6 @@ class PunchOutEnv(NESEnv):
 
         return 0
 
-    # MARK: nes-py API calls
-
     def _will_reset(self):
         """Handle and RAM hacking before a reset occurs."""
         self._time_last = 0
@@ -347,14 +333,12 @@ class PunchOutEnv(NESEnv):
 
     def get_reward(self):
         """Return the reward after a step occurs."""
-        return (15*self._next_opp_reward) + (self._time_penalty)*0.1 + (2*self._ko_reward) + self._hit_reward + self._health_penalty
+        return (30*self._next_opp_reward) + (self._time_penalty*2 + self._health_penalty + self._ko_reward + self._hit_reward)*0.01 + self._downed_penalty*3
 
     def _get_done(self):
         """Return True if the episode is over, False otherwise."""
-        # if self.is_single_stage_env:
-        # return self._is_dying or self._is_dead or self._flag_get
-        return self.was_hit
-        return self._mac_down_count > 0 or self._round > 1
+        # return self.was_hit
+        return self._round > 1 or self._mac_losses > 0
 
     def _get_info(self):
         """Return the info after a step occurs"""
