@@ -6,14 +6,14 @@ class Agent:
 
         models_dict = {0: "BTR_MTPO120M_28.5M.model", 1: "BTR_MTPO120M_5.8M.model"}
 
-        model_type = 0
+        model_type = 1
 
         self.net = ImpalaCNNLargeIQN(input_dims[0], n_actions, spectral=True, device=device, noisy=True,
                                      maxpool=True, model_size=2 + model_type, num_tau=8, maxpool_size=6,
                                      dueling=True, linear_size=512, ncos=64,
                                      arch="impala", layer_norm=False, activation="relu")
 
-        self.net.load_checkpoint("output/" + models_dict[model_type])
+        self.net.load_checkpoint("models/" + models_dict[model_type])
 
     def choose_action(self, observation):
         with T.no_grad():

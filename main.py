@@ -1,34 +1,9 @@
-import numpy as np
 import torch
-import gymnasium as gym
+import numpy as np
 from Agent import Agent
-from MTPOPreprocessingCustom import MTPOPreprocessingCustom
-
-from nes_env.mtpo_env import PunchOutEnv
-
-def make_env(envs_create, framestack, headless=True):
-    rom_path = (
-        "nes_env/punch.nes"
-    )
-    print(f"Creating {envs_create} envs")
-
-    def create_env():
-        gym.register(
-            id="gymnasium_env/mtpo-v5",
-            entry_point=PunchOutEnv,
-        )
-        env = MTPOPreprocessingCustom(gym.make("gymnasium_env/mtpo-v5", rom_path=rom_path, headless=headless))
-
-        return gym.wrappers.FrameStackObservation(env, stack_size=framestack)
-    
-    return gym.vector.AsyncVectorEnv(
-        [lambda: create_env() for _ in range(envs_create)],
-        context="spawn",  # Required for Windows
-    )
+from boxing_gym import make_env
 
 def main():
-
-
     framestack = 4
 
     n_steps = 8000
@@ -38,7 +13,7 @@ def main():
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print("Device: " + str(device))
 
-    env = make_env(1, framestack, headless=False)
+    env = make_env()
 
     n_actions = env.action_space[0].n
     print(f"Env has {n_actions} actions")
