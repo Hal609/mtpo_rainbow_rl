@@ -10,7 +10,6 @@ class PunchOutEnvNoStop(PunchOutEnv):
     
 def main():
     framestack = 4
-
     n_steps = 8000
 
     print("Currently Playing Game: MTPO")
@@ -23,8 +22,8 @@ def main():
     n_actions = env.action_space[0].n
     print(f"Env has {n_actions} actions")
 
-    agent = Agent(n_actions=env.action_space[0].n, input_dims=[framestack, 84, 84], device=device, num_envs=1,
-                  agent_name="MTPO", total_frames=n_steps)
+    agent = Agent(n_actions=env.action_space[0].n, input_dims=[framestack, 84, 84], device=device,
+                  num_envs=1, agent_name="MTPO", total_frames=n_steps)
 
     steps = 0
     episodes = 0
@@ -50,7 +49,6 @@ def main():
     print("Finished, job completed successfully!")
 
     env.close()
-
 
 if __name__ == '__main__':
     main()
