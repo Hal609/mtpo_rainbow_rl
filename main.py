@@ -1,8 +1,13 @@
 import torch
 import numpy as np
 from Agent import Agent
-from boxing_gym import make_env
+from boxing_gym import make_env, PunchOutEnv
 
+class PunchOutEnvNoStop(PunchOutEnv):
+    # Modify environment to allow agent to play continuously
+    def _get_done(self):
+        return False
+    
 def main():
     framestack = 4
 
@@ -13,7 +18,7 @@ def main():
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print("Device: " + str(device))
 
-    env = make_env()
+    env = make_env(fps_limit=60, use_class=PunchOutEnvNoStop)
 
     n_actions = env.action_space[0].n
     print(f"Env has {n_actions} actions")
