@@ -1,11 +1,8 @@
-import numpy as np
-from collections import deque
-import torch
-import time
-import gymnasium as gym
-import numpy
-from math import sqrt
+''' Prioritised Experience Replay from Beyond the Rainbow - Clark et al. (2024). '''
 
+import time
+import torch
+import numpy as np
 
 # SumTree
 # a binary tree data structure where the parent’s value is the sum of its children
@@ -147,9 +144,6 @@ class PER:
 
         self.overlap = self.framestack - self.n_step
 
-        #self.priority_min = [float('inf') for _ in range(2 * self.size)]
-        #print("Prio Size: " + str(len(self.priority_min)))
-
     def append(self, state, action, reward, n_state, done, stream, prio=True):
 
         # append to memory
@@ -165,13 +159,6 @@ class PER:
 
         self.last_terminal[stream] = done
 
-    # def _set_priority_min(self, idx, priority_alpha):
-    #     idx += self.size
-    #     self.priority_min[idx] = priority_alpha
-    #     while idx >= 2:
-    #         idx //= 2
-    #         self.priority_min[idx] = min(self.priority_min[2 * idx], self.priority_min[2 * idx + 1])
-
     def append_pointer(self, stream, prio):
 
         while len(self.state_buffer[stream]) >= self.framestack + self.n_step and len(self.reward_buffer[stream]) >= self.n_step:
@@ -183,9 +170,6 @@ class PER:
 
             # Reward array (first N rewards)
             reward_array = self.reward_buffer[stream][:self.n_step]
-
-            #print("Added Experience: (" + str(self.point_mem_idx) + ")")
-            #print((np.array(state_array, dtype=int), np.array(n_state_array, dtype=int), np.array(reward_array, dtype=int)))
 
             # Add the experience to the list
             self.pointer_mem[self.point_mem_idx] = (np.array(state_array, dtype=int), np.array(n_state_array, dtype=int),
@@ -218,11 +202,6 @@ class PER:
             while len(reward_array) < self.n_step:
                 reward_array.extend([0])
 
-            #print(reward_array)
-
-            # print("Added Experience: (" + str(self.point_mem_idx) + ")")
-            # print((np.array(first_array, dtype=int), np.array(second_array, dtype=int),
-            #                                                  np.array(reward_array, dtype=int)))
             # Add the experience
             self.pointer_mem[self.point_mem_idx] = (np.array(first_array, dtype=int), np.array(second_array, dtype=int),
                                                              np.array(reward_array, dtype=int))
@@ -296,8 +275,6 @@ class PER:
 
         # fetch the pointers by using indices
         pointers = self.pointer_mem[idxs]
-        #print("Pointers")
-        #print(pointers)
 
         # Extract the pointers into separate arrays
         state_pointers = np.array([p[0] for p in pointers])
@@ -376,109 +353,9 @@ class PER:
     def update_priorities(self, idxs, priorities):
         priorities = priorities + self.eps
 
-        # for idx, priority in zip(idxs, priorities):
-        #     self._set_priority_min(idx - self.size + 1, sqrt(priority))
-
         if np.isnan(priorities).any():
             print("NaN found in priority!")
             print(f"priorities: {priorities}")
 
         self.max_prio = max(self.max_prio, np.max(priorities))
         self.st.update(idxs, priorities ** self.alpha)
-
-def create_experience(previous_state):
-    state = previous_state[:]
-    action = np.random.randint(0, 18)
-    reward = np.random.choice([0, 1], p=[0.5, 0.5])
-    new_frame = np.random.randint(1, 255, (image_size, image_size), dtype=np.uint8)
-    state_ = np.roll(previous_state, shift=-1, axis=0)
-    state_[-1] = new_frame
-
-    done = np.random.choice([False, True], p=[0.9, 0.1])
-
-    return state, action, reward, state_, done
-
-
-if __name__ == "__main__":
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    framestack = 4
-    tree = PER(8, device, 3, 2, 0.99, alpha=0.2, beta=0.4, framestack=framestack, imagex=2, imagey=2)
-
-    image_size = 2
-    batch_size = 2
-
-    """    env = gym.wrappers.FrameStack(gym.wrappers.AtariPreprocessing(gym.make("ALE/" + "Pong" + "-v5", frameskip=1)), 4, lz4_compress=False)
-    state, _ = env.reset()
-
-    for i in range(12):
-        state_, reward, done, trun, _ = env.step(env.action_space.sample())
-
-        if i != 11:
-            state = state_
-
-    from matplotlib import pyplot as plt
-
-    plt.imshow(state[3], interpolation='nearest')
-    plt.show()
-
-    plt.imshow(state_[0], interpolation='nearest')
-    plt.show()
-
-    plt.imshow(state_[1], interpolation='nearest')
-    plt.show()
-
-    plt.imshow(state_[2], interpolation='nearest')
-    plt.show()
-
-    plt.imshow(state_[3], interpolation='nearest')
-    plt.show()
-
-    print(state_.shape)"""
-
-    s0 = np.random.randint(1, 255, (framestack, image_size, image_size), dtype=np.uint8)
-    s1 = np.random.randint(1, 255, (framestack, image_size, image_size), dtype=np.uint8)
-    start = time.time()
-    tot_samples = 0
-    for i in range(20):
-
-        state, action, reward, state_, done = create_experience(s0)
-        if i == 5:
-            done = True
-
-        tree.append(state, action, reward, state_, done, 0)
-        tot_samples += 1
-        s0 = state_[:]
-
-        print("Maintree")
-        print(tree.st.sum_tree)
-        print("min tree")
-        print(np.array(tree.priority_min))
-
-        state, action, reward, state_, done = create_experience(s1)
-
-        tree.append(state, action, reward, state_, done, 1)
-        tot_samples += 1
-
-        s1 = state_[:]
-
-        print("Maintree")
-        print(tree.st.sum_tree)
-        print("min tree")
-        print(np.array(tree.priority_min))
-
-        if tree.capacity >= batch_size:
-            for i in range(20):
-                tree_idxs, states, actions, rewards, n_states, dones, weights = tree.sample(batch_size)
-
-                if np.isin(0, states.cpu()):
-                    print(states)
-                    asdafda
-
-            # Update priorities
-            new_priorities = np.array([round(np.random.random(), 3) for i in range(batch_size)])
-            tree.update_priorities(tree_idxs, new_priorities)
-
-    end = time.time()
-    print("Time:")
-    print(end - start)
-    raise Exception("Done")

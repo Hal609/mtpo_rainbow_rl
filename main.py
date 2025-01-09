@@ -1,64 +1,17 @@
-import numpy as np
-import time
-from copy import deepcopy
-import torch
-import gymnasium as gym
 import os
-import argparse
+import time
+import torch
+from copy import deepcopy
+import numpy as np
 import multiprocessing as mp
+from boxing_gym import make_env
 from Agent import Agent, choose_eval_action
-from SMBPreprocessingCustom import SMBPreprocessingCustom
-from functools import partial
-from matplotlib import pyplot as plt
-
-from smb_env.mtpo_env import PunchOutEnv
-
-def make_env(envs_create, game, life_info, framestack, repeat_probs, headless=True):
-    rom_path = (
-        "C:/Users/offan/Downloads/4398_Beyond_The_Rainbow_High_P_Supplementary Material/"
-        "BeyondTheRainbowICLR/smb_env/punch.nes"
-    )
-    print(f"Creating {envs_create} envs")
-
-    def create_env():
-        gym.register(
-            id="gymnasium_env/mtpo-v5",
-            entry_point=PunchOutEnv,
-        )
-        env = SMBPreprocessingCustom(gym.make("gymnasium_env/mtpo-v5", rom_path=rom_path, headless=headless))
-
-        return gym.wrappers.FrameStack(env, num_stack=framestack, lz4_compress=False)
-    
-    return gym.vector.AsyncVectorEnv(
-        [lambda: create_env() for _ in range(envs_create)],
-        context="spawn",  # Required for Windows
-    )
 
 
-def non_default_args(args, parser):
-    result = []
-    for arg in vars(args):
-        user_val = getattr(args, arg)
-        default_val = parser.get_default(arg)
-        if user_val != default_val and default_val != "NameThisGame" and arg != "include_evals" and arg != "eval_envs"\
-                and arg != "num_eval_episodes" and arg != "analy":
+def evaluate_agent(net_state_dict, network_creator, eval_envs, num_eval_episodes, agent_name, testing, game,
+                   n_actions, device, index, framestack):
 
-            result.append(f"{arg}={user_val}")
-    return ', '.join(result)
-
-
-def format_arguments(arg_string):
-    arg_string = arg_string.replace('=', '')
-    arg_string = arg_string.replace('True', '1')
-    arg_string = arg_string.replace('False', '0')
-    arg_string = arg_string.replace(', ', '_')
-    return arg_string
-
-
-def evaluate_agent(net_state_dict, network_creator, eval_envs, num_eval_episodes, agent_name, testing, game, life_info,
-                   n_actions, device, index, framestack, repeat_probs):
-
-    eval_env = make_env(eval_envs, game, life_info, framestack, repeat_probs)
+    eval_env = make_env(eval_envs, game, framestack=framestack, headless=False)
     evals = []
     eval_episodes = 0
     eval_scores = np.array([0 for i in range(eval_envs)])
@@ -66,13 +19,10 @@ def evaluate_agent(net_state_dict, network_creator, eval_envs, num_eval_episodes
 
     eval_net = network_creator()
 
-    # move state dict to gpu - pytorch doesn't allow sharing across threads on gpu
     state_dict_gpu = {k: v.to(device) for k, v in net_state_dict.items()}
 
     eval_net.load_state_dict(state_dict_gpu)
 
-    # this massively helps speed up training since agents get stuck in some games, causing evals to last a very
-    # long time. Also nice to see the difference between 0.00 and 0.01 during evals, like Atari Phoenix.
     if index <= 125:
         rng = 0.01
     else:
@@ -108,104 +58,35 @@ def evaluate_agent(net_state_dict, network_creator, eval_envs, num_eval_episodes
 
 
 def main():
-    parser = argparse.ArgumentParser()
-
-    # environment setup
-    parser.add_argument('--game', type=str, default="MTPO")
-    parser.add_argument('--envs', type=int, default=36)
-    parser.add_argument('--bs', type=int, default=256)
-    parser.add_argument('--rr', type=float, default=1)
-    parser.add_argument('--frames', type=int, default=120000000)
-    parser.add_argument('--repeat', type=int, default=0)
-    parser.add_argument('--include_evals', type=int, default=0)
-    parser.add_argument('--eval_envs', type=int, default=1)
-    parser.add_argument('--life_info', type=int, default=0)
-    parser.add_argument('--num_eval_episodes', type=int, default=1)
-    parser.add_argument('--analy', type=int, default=False)
-    parser.add_argument('--framestack', type=int, default=4)
-    parser.add_argument('--sticky', type=int, default=1)
-
-    # agent setup
-    parser.add_argument('--nstep', type=int, default=3)
-    parser.add_argument('--vector', type=int, default=1)
-    parser.add_argument('--maxpool_size', type=int, default=6)
-    parser.add_argument('--lr', type=float, default=1e-4)
-    parser.add_argument('--testing', type=bool, default=False)
-    parser.add_argument('--munch', type=int, default=1)
-    parser.add_argument('--munch_alpha', type=float, default=0.9)
-    parser.add_argument('--grad_clip', type=int, default=10)
-
-    parser.add_argument('--noisy', type=int, default=1)
-    parser.add_argument('--spectral', type=int, default=1)
-    parser.add_argument('--iqn', type=int, default=1)
-    parser.add_argument('--c51', type=int, default=0)
-    parser.add_argument('--maxpool', type=int, default=1)
-    parser.add_argument('--arch', type=str, default='impala')
-    parser.add_argument('--impala', type=int, default=1) 
-    parser.add_argument('--discount', type=float, default=0.997)
-    parser.add_argument('--per', type=int, default=1)
-    parser.add_argument('--taus', type=int, default=8)
-    parser.add_argument('--c', type=int, default=500)
-    parser.add_argument('--dueling', type=int, default=1)
-    parser.add_argument('--linear_size', type=int, default=512)
-    parser.add_argument('--model_size', type=float, default=4)
-
-    parser.add_argument('--double', type=int, default=0)
-    parser.add_argument('--ncos', type=int, default=64)
-    parser.add_argument('--per_alpha', type=float, default=0.2)
-    parser.add_argument('--per_beta_anneal', type=int, default=0)
-    parser.add_argument('--layer_norm', type=int, default=0)
-    parser.add_argument('--eps_steps', type=int, default=10000000)
-    parser.add_argument('--eps_disable', type=int, default=1)
-    parser.add_argument('--activation', type=str, default="relu")
-
-    args = parser.parse_args()
-
-    arg_string = non_default_args(args, parser)
-    formatted_string = format_arguments(arg_string)
-    print(formatted_string)
-
-    game = args.game
-    envs = args.envs
-    bs = args.bs
-    rr = args.rr
-    c = args.c
-    lr = args.lr
-    life_info = args.life_info
-    num_eval_episodes = args.num_eval_episodes
-    analy = args.analy
-    framestack = args.framestack
-    sticky = args.sticky
+    game = "MTPO"
+    envs = 1 # Number of parallel environments
+    bs = 256 # Batch size
+    rr = 1 # Replay ratio
+    c = 500 # Replace target every c gradient steps
+    lr = 1e-4 # Learning rate
+    include_evals = True # Whether to include intermittent evaluations
+    num_eval_episodes = 100 # Number of episodes to run to perform evaluation
+    eval_envs = 10 # Number of environments which are created per evaluation
+    analy = True # Analysis
+    framestack = 4 # Number of frames stacked to form a single observation
+    sticky = True
     repeat_probs = 0 if not sticky else 0.25
-
-    nstep = args.nstep
-    maxpool_size = args.maxpool_size
-    noisy = args.noisy
-    spectral = args.spectral
-    munch = args.munch
-    munch_alpha = args.munch_alpha
-    grad_clip = args.grad_clip
-    arch = args.arch
-    iqn = args.iqn
-    double = args.double
-    dueling = args.dueling
-    impala = args.impala
-    discount = args.discount
-    linear_size = args.linear_size
-    per = args.per
-    taus = args.taus
-    model_size = args.model_size
-    frames = args.frames // 4
-    ncos = args.ncos
-    maxpool = args.maxpool
-    vector = args.vector
-    per_alpha = args.per_alpha
-    per_beta_anneal = args.per_beta_anneal
-    layer_norm = args.layer_norm
-    c51 = args.c51
-    eps_steps = args.eps_steps
-    eps_disable = args.eps_disable
-    activation = args.activation
+    nstep = 3
+    munch_alpha = 0.9
+    grad_clip = 10
+    arch = "impala"
+    discount = 0.997 # Discount factor gamma
+    linear_size = 512 # Number of nodes in the linear portion of the model
+    taus = 8
+    model_size = 2 # Impala network scale factor
+    arg_frames = 200000000 # Number of frames to run the environment for
+    frames = arg_frames // 4
+    ncos = 64
+    vector = True # Whether environment is vectorised  
+    per_alpha = 0.2 # Alpha for prioritised experience replay
+    eps_steps = 2000000 # Number of steps to reduce epsilon to zero
+    activation = "relu" # Activation function
+    testing = False # Whether the environment is being tested
 
     if not vector:
         lr = 5e-5
@@ -215,24 +96,19 @@ def main():
 
     lr_str = "{:e}".format(lr)
     lr_str = str(lr_str).replace(".", "").replace("0", "")
-    frame_name = str(int(args.frames / 1000000)) + "M"
+    frame_name = str(int(arg_frames / 1000000)) + "M"
 
-    include_evals = bool(args.include_evals)
     agent_name = "BTR_" + game + frame_name
 
-    if len(formatted_string) > 2:
-        agent_name += '_' + formatted_string
-
     print("Agent Name:" + str(agent_name))
-    testing = args.testing
 
     if not testing:
         counter = 0
         while True:
             if counter == 0:
-                new_dir_name = "output/" + agent_name
+                new_dir_name = agent_name
             else:
-                new_dir_name = f"output/{agent_name}_{counter}"
+                new_dir_name = f"{agent_name}_{counter}"
             if not os.path.exists(new_dir_name):
                 break
             counter += 1
@@ -240,10 +116,10 @@ def main():
         print(f"Created directory: {new_dir_name}")
         os.chdir(new_dir_name)
 
-    # create blank evaluation file
+    # Create blank evaluation file
     fname = agent_name + "Evaluation.npy"
     if not testing:
-        np.save(fname, np.zeros((args.frames // 1000000, num_eval_episodes)))
+        np.save(fname, np.zeros((arg_frames // 1000000, num_eval_episodes)))
 
     if testing:
         num_envs = 4
@@ -254,9 +130,8 @@ def main():
         bs = 32
     else:
         num_envs = envs
-        eval_envs = args.eval_envs
         n_steps = frames
-        eval_every = 500000
+        eval_every = 250000
     next_eval = eval_every
 
     print("Currently Playing Game: " + str(game))
@@ -265,20 +140,15 @@ def main():
     device = torch.device('cuda:' + gpu if torch.cuda.is_available() else 'cpu')
     print("Device: " + str(device))
 
-    env = make_env(num_envs, game, life_info, framestack, repeat_probs, headless=vector)
-
+    env = make_env(num_envs, framestack=4, headless=False)
     n_actions = env.action_space[0].n
-    print(f"Env has {n_actions} actions")
+    print(f"Env has {n_actions} actions.")
 
     agent = Agent(n_actions=env.action_space[0].n, input_dims=[framestack, 84, 84], device=device, num_envs=num_envs,
                   agent_name=agent_name, total_frames=n_steps, testing=testing, batch_size=bs, rr=rr, lr=lr,
-                  maxpool_size=maxpool_size, target_replace=c,
-                  noisy=noisy, spectral=spectral, munch=munch, iqn=iqn, double=double, dueling=dueling, impala=impala,
-                  discount=discount, per=per, taus=taus,
-                  model_size=model_size, linear_size=linear_size, ncos=ncos, maxpool=maxpool, replay_period=num_envs,
-                  analytics=analy, framestack=framestack, arch=arch, per_alpha=per_alpha,
-                  per_beta_anneal=per_beta_anneal, layer_norm=layer_norm, c51=c51, eps_steps=eps_steps,
-                  eps_disable=eps_disable, activation=activation, n=nstep, munch_alpha=munch_alpha, grad_clip=grad_clip)
+                  target_replace=c, discount=discount, taus=taus, model_size=model_size, linear_size=linear_size, 
+                  ncos=ncos, replay_period=num_envs, analytics=analy, framestack=framestack, arch=arch, per_alpha=per_alpha,
+                  eps_steps=eps_steps, activation=activation, n=nstep, munch_alpha=munch_alpha, grad_clip=grad_clip)
 
     scores_temp = []
     steps = 0
@@ -314,18 +184,17 @@ def main():
         reward = np.clip(reward, -1., 1.)
 
         for stream in range(num_envs):
-            terminal_in_buffer = done_[stream] #or info["lost_life"][stream]
+            terminal_in_buffer = done_[stream]
             agent.store_transition(observation[stream], action[stream], reward[stream], observation_[stream],
                                    terminal_in_buffer, stream=stream)
 
         observation = observation_
 
         if steps % 1200 == 0 and len(scores) > 0:
-            print(f"Memory usage: {torch.cuda.memory_allocated()} / {torch.cuda.max_memory_allocated()}")
             avg_score = np.mean(scores_temp[-50:])
             if episodes % 1 == 0:
-                print('{} {} avg score {:.5f} total_steps {:.0f} fps {:.2f} games {} epsi {}'
-                      .format(agent_name, game, avg_score, steps, (steps - last_steps) / (time.time() - last_time), episodes, round(agent.epsilon.eps, 3)),
+                print('{} {} avg score {:.2f} total_steps {:.0f} fps {:.2f} games {}'
+                      .format(agent_name, game, avg_score, steps, (steps - last_steps) / (time.time() - last_time), episodes),
                       flush=True)
                 last_steps = steps
                 last_time = time.time()
@@ -335,7 +204,7 @@ def main():
             print("Evaluating")
 
             # Save model
-            if not testing: # and (current_eval + 1) % 10 == 0:
+            if not testing:
                 agent.save_model()
 
             fname = agent_name + "Experiment.npy"
@@ -344,8 +213,7 @@ def main():
 
             if include_evals:
 
-                # wait for our evaluations to finish before we start the next evaluation
-
+                # Wait for evaluations to finish before we start the next evaluation
                 for process in processes:
                     process.join()
 
@@ -356,7 +224,7 @@ def main():
                 # Start evaluation in a separate process
                 eval_process = mp.Process(target=evaluate_agent,
                                           args=(net_state_dict, network_creator, eval_envs, num_eval_episodes, agent_name, testing, game,
-                                                life_info, n_actions, device, current_eval, framestack, repeat_probs))
+                                                n_actions, device, current_eval, framestack))
                 eval_process.start()
                 processes.append(eval_process)
 
