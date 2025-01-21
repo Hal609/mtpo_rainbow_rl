@@ -5,4 +5,4 @@ opencv-python>=4.10.0.84
 torch>=2.5.1
 PySDL2>=0.9.16
 opencv-python>=4.10.0.84
-boxing_gym>=0.1.4
+boxing_gym>=0.1.15

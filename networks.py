@@ -71,7 +71,7 @@ class FactorizedNoisyLinear(nn.Module):
                         self.bias_mu + self.bias_sigma*self.bias_epsilon)
 
 class Dueling(nn.Module):
-    """ The dueling branch used in all nets that use dueling-dqn. """
+    """ Dueling branch. """
     def __init__(self, value_branch, advantage_branch):
         super().__init__()
         self.flatten = nn.Flatten()

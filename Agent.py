@@ -9,7 +9,6 @@ class Agent:
         model_type = 1
 
         self.net = ImpalaCNNLargeIQN(input_dims[0], n_actions, device=device, model_size=2 + model_type, linear_size=512)
-
         self.net.load_checkpoint("models/" + models_dict[model_type])
 
     def choose_action(self, observation):
